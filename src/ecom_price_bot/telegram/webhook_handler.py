@@ -14,6 +14,7 @@ from ecom_price_bot.security import sign_chart_token
 from ecom_price_bot.telegram.formatting import (
     format_daily_report,
     format_help,
+    format_watch_index,
     format_watch_list,
     split_message,
 )
@@ -159,9 +160,12 @@ class TelegramWebhookHandler:
                 argument,
             )
             if removed is None:
-                await self._send_text(chat_id, "Nothing matched that watch id or url.")
+                await self._send_text(chat_id, "Nothing matched that watch index or url.")
                 return
-            await self._send_text(chat_id, f"Removed watch [{removed.id}] {removed.name}")
+            await self._send_text(
+                chat_id,
+                f"Removed watch [{format_watch_index(removed)}] {removed.name}",
+            )
             return
 
         if command == "refresh":
@@ -180,9 +184,9 @@ class TelegramWebhookHandler:
 
         if command == "chart":
             if not argument or not argument.isdigit():
-                await self._send_text(chat_id, "Usage: /chart <watch-id>")
+                await self._send_text(chat_id, "Usage: /chart <watch-index>")
                 return
-            await self._send_chart(synced_user, int(argument), reply_chat_id=synced_user.chat_id)
+            await self._send_chart(synced_user, argument, reply_chat_id=synced_user.chat_id)
             return
 
         if command:
@@ -193,12 +197,20 @@ class TelegramWebhookHandler:
         if query is None or query.data is None:
             return
 
-        action, _, raw_id = query.data.partition(":")
-        if not raw_id.isdigit():
+        parts = query.data.split(":", maxsplit=2)
+        action = parts[0]
+        display_index: int | None = None
+        raw_id = ""
+        if len(parts) == 2:
+            raw_id = parts[1]
+        elif len(parts) == 3:
+            if parts[1].isdigit():
+                display_index = int(parts[1])
+            raw_id = parts[2]
+
+        if not raw_id:
             await query.answer("Unsupported action", show_alert=True)
             return
-
-        watch_id = int(raw_id)
 
         if action == "remove":
             removed = self.dependencies.watchlist_controller.remove_watch(
@@ -209,33 +221,49 @@ class TelegramWebhookHandler:
             if removed is None:
                 await query.edit_message_text("That watch item was already removed.")
                 return
-            await query.edit_message_text(f"Removed watch [{removed.id}] {removed.name}")
+            label = display_index if display_index is not None else format_watch_index(removed)
+            await query.edit_message_text(f"Removed watch [{label}] {removed.name}")
             return
 
         if action == "chart":
             await query.answer()
-            await self._send_chart(synced_user, watch_id, reply_chat_id=synced_user.chat_id)
+            await self._send_chart(
+                synced_user,
+                raw_id,
+                reply_chat_id=synced_user.chat_id,
+                display_index=display_index,
+            )
             return
 
         await query.answer("Unsupported action", show_alert=True)
 
-    async def _send_chart(self, synced_user: TelegramUser, watch_id: int, reply_chat_id: int) -> None:
-        watch = self.dependencies.watchlist_controller.get_watch(synced_user.telegram_user_id, watch_id)
+    async def _send_chart(
+        self,
+        synced_user: TelegramUser,
+        watch_identifier: str,
+        reply_chat_id: int,
+        display_index: int | None = None,
+    ) -> None:
+        watch = self.dependencies.watchlist_controller.get_watch(
+            synced_user.telegram_user_id,
+            watch_identifier,
+        )
         if watch is None:
-            await self.bot.send_message(chat_id=reply_chat_id, text="Unknown watch id.")
+            await self.bot.send_message(chat_id=reply_chat_id, text="Unknown watch index.")
             return
 
         history = self.dependencies.watchlist_controller.get_price_history(
             synced_user.telegram_user_id,
-            watch_id,
+            watch.id,
             limit=180,
         )
         chart_bytes = render_price_history_chart(watch, history)
-        reply_markup = self._build_chart_link_markup(synced_user, watch_id)
+        reply_markup = self._build_chart_link_markup(synced_user, watch.id)
+        label = str(display_index) if display_index is not None else format_watch_index(watch)
         await self.bot.send_photo(
             chat_id=reply_chat_id,
-            photo=InputFile(BytesIO(chart_bytes), filename=f"watch-{watch_id}.png"),
-            caption=f"Price chart for [{watch.id}] {watch.name}",
+            photo=InputFile(BytesIO(chart_bytes), filename=f"watch-{label}.png"),
+            caption=f"Price chart for [{label}] {watch.name}",
             reply_markup=reply_markup,
         )
 
@@ -244,10 +272,11 @@ class TelegramWebhookHandler:
             return None
         rows = []
         for watch in watches:
+            label = format_watch_index(watch)
             rows.append(
                 [
-                    InlineKeyboardButton(f"Chart {watch.id}", callback_data=f"chart:{watch.id}"),
-                    InlineKeyboardButton(f"Remove {watch.id}", callback_data=f"remove:{watch.id}"),
+                    InlineKeyboardButton(f"Chart {label}", callback_data=f"chart:{label}:{watch.id}"),
+                    InlineKeyboardButton(f"Remove {label}", callback_data=f"remove:{label}:{watch.id}"),
                 ]
             )
         return InlineKeyboardMarkup(rows)
@@ -255,7 +284,7 @@ class TelegramWebhookHandler:
     def _build_chart_link_markup(
         self,
         synced_user: TelegramUser,
-        watch_id: int,
+        watch_id: str,
     ) -> InlineKeyboardMarkup | None:
         app_base_url = self.dependencies.settings.app_base_url
         signing_secret = self.dependencies.settings.chart_signing_secret

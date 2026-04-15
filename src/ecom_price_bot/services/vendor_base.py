@@ -71,8 +71,7 @@ class GenericVendorService(ABC):
         )
 
     def fetch_discounts(self) -> list[Discount]:
-        discounts: list[Discount] = []
-        seen: set[tuple[str | None, str]] = set()
+        discounts_by_code: dict[str, Discount] = {}
         for url in self.get_discount_urls():
             response = self.web_client.get(url)
             if self.is_block_page(response.text):
@@ -82,25 +81,27 @@ class GenericVendorService(ABC):
                 code = extract_discount_code(cleaned_condition)
                 if not code:
                     continue
-                key = (code, cleaned_condition.casefold())
-                if key in seen:
-                    continue
-                seen.add(key)
-                discounts.append(
-                    Discount(
-                        vendor_id=self.vendor_id,
-                        code=code,
-                        condition=cleaned_condition,
-                        source_url=response.url,
-                    )
+                candidate = Discount(
+                    vendor_id=self.vendor_id,
+                    code=code,
+                    condition=cleaned_condition,
+                    source_url=response.url,
                 )
-        return discounts
+                existing = discounts_by_code.get(code)
+                if existing is None or self._is_better_discount_candidate(candidate, existing):
+                    discounts_by_code[code] = candidate
+        return list(discounts_by_code.values())
 
     def clean_product_name(self, name: str) -> str:
         return " ".join(name.split())
 
     def clean_discount_condition(self, text: str) -> str:
         return " ".join(text.split())
+
+    def _is_better_discount_candidate(self, candidate: Discount, existing: Discount) -> bool:
+        if len(candidate.condition) != len(existing.condition):
+            return len(candidate.condition) > len(existing.condition)
+        return candidate.source_url < existing.source_url
 
     def get_discount_urls(self) -> tuple[str, ...]:
         return self.discount_seed_urls

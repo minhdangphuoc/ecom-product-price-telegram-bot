@@ -9,13 +9,20 @@ MAX_DISCOUNTS_PER_VENDOR = 10
 MAX_MESSAGE_LENGTH = 3800
 
 
+def format_watch_index(watch: WatchingProduct) -> str:
+    return str(watch.display_index) if watch.display_index is not None else "?"
+
+
 def format_currency(amount: Decimal, currency: str) -> str:
     symbols = {"EUR": "EUR ", "USD": "USD ", "GBP": "GBP "}
     return f"{symbols.get(currency.upper(), currency.upper() + ' ')}{amount:.2f}"
 
 
 def format_price_update(update: PriceUpdate) -> str:
-    base = f"[{update.watch.id}] {update.current.name}\n{format_currency(update.current.price, update.current.currency)}"
+    base = (
+        f"[{format_watch_index(update.watch)}] {update.current.name}\n"
+        f"{format_currency(update.current.price, update.current.currency)}"
+    )
     if update.delta is not None:
         direction = "down" if update.delta < 0 else "up" if update.delta > 0 else "same"
         if direction == "same":
@@ -36,9 +43,9 @@ def format_watch_list(watches: list[WatchingProduct]) -> str:
     parts = ["Watching products:"]
     for watch in watches:
         parts.append(
-            f"[{watch.id}] {watch.name} ({watch.vendor_id})\n"
+            f"[{format_watch_index(watch)}] {watch.name} ({watch.vendor_id})\n"
             f"{watch.url}\n"
-            f"Use /chart {watch.id} for a price chart."
+            f"Use /chart {format_watch_index(watch)} for a price chart."
         )
     return "\n\n".join(parts)
 
@@ -83,10 +90,10 @@ def format_help() -> str:
         "/watch <url> - add a product to the watch list\n"
         "/add <url> - alias for /watch\n"
         "/list - show watched products\n"
-        "/remove <id|url> - remove a watched product\n"
+        "/remove <index|url> - remove a watched product\n"
         "/refresh - fetch prices and discounts now\n"
         "/discounts - fetch only discounts now\n"
-        "/chart <id> - show a price history chart for a watched product\n"
+        "/chart <index> - show a price history chart for a watched product\n"
         "/help - show this message"
     )
 

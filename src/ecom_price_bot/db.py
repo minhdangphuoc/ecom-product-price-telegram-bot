@@ -187,7 +187,7 @@ class Database:
     def get_watch_for_user(
         self,
         telegram_user_id: int,
-        watch_id: int,
+        watch_id: str,
     ) -> WatchingProduct | None:
         with self.connect() as connection:
             row = connection.execute(
@@ -195,48 +195,54 @@ class Database:
                 SELECT *
                 FROM public.watched_products
                 WHERE telegram_user_id = %s
-                  AND id = %s
+                  AND id = %s::uuid
                   AND active = TRUE
                 """,
                 (telegram_user_id, watch_id),
             ).fetchone()
         return self._row_to_watching_product(row) if row else None
 
-    def remove_watch(
+    def remove_watch_by_id(
         self,
         telegram_user_id: int,
-        identifier: str,
+        watch_id: str,
     ) -> WatchingProduct | None:
         with self.connect() as connection:
-            if identifier.isdigit():
-                row = connection.execute(
-                    """
-                    UPDATE public.watched_products
-                    SET active = FALSE,
-                        updated_at = now()
-                    WHERE telegram_user_id = %s
-                      AND id = %s
-                      AND active = TRUE
-                    RETURNING *
-                    """,
-                    (telegram_user_id, int(identifier)),
-                ).fetchone()
-            else:
-                row = connection.execute(
-                    """
-                    UPDATE public.watched_products
-                    SET active = FALSE,
-                        updated_at = now()
-                    WHERE telegram_user_id = %s
-                      AND url = %s
-                      AND active = TRUE
-                    RETURNING *
-                    """,
-                    (telegram_user_id, identifier),
-                ).fetchone()
+            row = connection.execute(
+                """
+                UPDATE public.watched_products
+                SET active = FALSE,
+                    updated_at = now()
+                WHERE telegram_user_id = %s
+                  AND id = %s::uuid
+                  AND active = TRUE
+                RETURNING *
+                """,
+                (telegram_user_id, watch_id),
+            ).fetchone()
         return self._row_to_watching_product(row) if row else None
 
-    def save_price_snapshot(self, watch_id: int, product: Product) -> PriceSnapshot:
+    def remove_watch_by_url(
+        self,
+        telegram_user_id: int,
+        url: str,
+    ) -> WatchingProduct | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                """
+                UPDATE public.watched_products
+                SET active = FALSE,
+                    updated_at = now()
+                WHERE telegram_user_id = %s
+                  AND url = %s
+                  AND active = TRUE
+                RETURNING *
+                """,
+                (telegram_user_id, url),
+            ).fetchone()
+        return self._row_to_watching_product(row) if row else None
+
+    def save_price_snapshot(self, watch_id: str, product: Product) -> PriceSnapshot:
         with self.connect() as connection:
             row = connection.execute(
                 """
@@ -265,13 +271,13 @@ class Database:
             ).fetchone()
         return self._row_to_price_snapshot(row)
 
-    def get_previous_snapshot(self, watch_id: int) -> PriceSnapshot | None:
+    def get_previous_snapshot(self, watch_id: str) -> PriceSnapshot | None:
         with self.connect() as connection:
             row = connection.execute(
                 """
                 SELECT *
                 FROM public.price_snapshots
-                WHERE watching_product_id = %s
+                WHERE watching_product_id = %s::uuid
                 ORDER BY observed_at DESC
                 LIMIT 1
                 """,
@@ -282,7 +288,7 @@ class Database:
     def list_price_history_for_user(
         self,
         telegram_user_id: int,
-        watch_id: int,
+        watch_id: str,
         limit: int = 90,
     ) -> list[PriceSnapshot]:
         with self.connect() as connection:
@@ -293,7 +299,7 @@ class Database:
                 INNER JOIN public.watched_products w
                     ON w.id = s.watching_product_id
                 WHERE w.telegram_user_id = %s
-                  AND w.id = %s
+                  AND w.id = %s::uuid
                 ORDER BY s.observed_at DESC
                 LIMIT %s
                 """,
@@ -319,10 +325,18 @@ class Database:
 
     def save_new_discounts(self, discounts: list[Discount], observed_on: date) -> list[Discount]:
         inserted: list[Discount] = []
+        normalized_by_vendor_and_code: dict[tuple[str, str], Discount] = {}
+
+        for discount in discounts:
+            if not discount.code:
+                continue
+            key = (discount.vendor_id, discount.code)
+            existing = normalized_by_vendor_and_code.get(key)
+            if existing is None or self._is_better_discount_record(discount, existing):
+                normalized_by_vendor_and_code[key] = discount
+
         with self.connect() as connection:
-            for discount in discounts:
-                if not discount.code:
-                    continue
+            for discount in normalized_by_vendor_and_code.values():
                 fingerprint = hashlib.sha1(
                     json.dumps(
                         {
@@ -345,7 +359,7 @@ class Database:
                         fingerprint
                     )
                     VALUES (%s, %s, %s, %s, %s, %s)
-                    ON CONFLICT (vendor_id, observed_on, fingerprint)
+                    ON CONFLICT (vendor_id, observed_on, code)
                     DO NOTHING
                     RETURNING vendor_id, code, condition, source_url
                     """,
@@ -427,7 +441,7 @@ class Database:
 
     def _row_to_watching_product(self, row: dict) -> WatchingProduct:
         return WatchingProduct(
-            id=row["id"],
+            id=str(row["id"]),
             telegram_user_id=row["telegram_user_id"],
             name=row["name"],
             url=row["url"],
@@ -439,8 +453,8 @@ class Database:
 
     def _row_to_price_snapshot(self, row: dict) -> PriceSnapshot:
         return PriceSnapshot(
-            id=row["id"],
-            watching_product_id=row["watching_product_id"],
+            id=str(row["id"]),
+            watching_product_id=str(row["watching_product_id"]),
             observed_at=row["observed_at"],
             product_name=row["product_name"],
             product_price=row["product_price"]
@@ -450,3 +464,8 @@ class Database:
             in_stock=bool(row["in_stock"]),
             article_number=row["article_number"],
         )
+
+    def _is_better_discount_record(self, candidate: Discount, existing: Discount) -> bool:
+        if len(candidate.condition) != len(existing.condition):
+            return len(candidate.condition) > len(existing.condition)
+        return candidate.source_url < existing.source_url

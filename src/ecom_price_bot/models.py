@@ -42,7 +42,7 @@ class Discount:
 
 @dataclass(slots=True)
 class WatchingProduct:
-    id: int
+    id: str
     telegram_user_id: int
     name: str
     url: str
@@ -50,12 +50,13 @@ class WatchingProduct:
     active: bool
     created_at: datetime
     updated_at: datetime
+    display_index: int | None = None
 
 
 @dataclass(slots=True)
 class PriceSnapshot:
-    id: int
-    watching_product_id: int
+    id: str
+    watching_product_id: str
     observed_at: datetime
     product_name: str
     product_price: Decimal

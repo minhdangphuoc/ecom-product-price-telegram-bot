@@ -34,7 +34,8 @@ class MonitoringController:
         if extra_errors:
             report.errors.extend(extra_errors)
         watches = self.database.list_active_watches_for_user(telegram_user_id)
-        for watch in watches:
+        for display_index, watch in enumerate(watches, start=1):
+            watch.display_index = display_index
             try:
                 report.updates.append(self.refresh_watch(watch))
             except Exception as exc:

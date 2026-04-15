@@ -69,7 +69,7 @@ async def daily_refresh(request: Request) -> JSONResponse:
 @app.get("/chart")
 async def chart(
     telegram_user_id: int,
-    watch_id: int,
+    watch_id: str,
     sig: str,
 ) -> Response:
     dependencies = get_dependencies()

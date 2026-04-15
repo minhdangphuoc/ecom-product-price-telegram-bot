@@ -4,7 +4,7 @@ import hashlib
 import hmac
 
 
-def sign_chart_token(secret: str, telegram_user_id: int, watch_id: int) -> str:
+def sign_chart_token(secret: str, telegram_user_id: int, watch_id: str) -> str:
     payload = f"{telegram_user_id}:{watch_id}".encode("utf-8")
     return hmac.new(secret.encode("utf-8"), payload, hashlib.sha256).hexdigest()
 
@@ -12,7 +12,7 @@ def sign_chart_token(secret: str, telegram_user_id: int, watch_id: int) -> str:
 def verify_chart_token(
     secret: str,
     telegram_user_id: int,
-    watch_id: int,
+    watch_id: str,
     signature: str,
 ) -> bool:
     expected = sign_chart_token(secret, telegram_user_id, watch_id)
