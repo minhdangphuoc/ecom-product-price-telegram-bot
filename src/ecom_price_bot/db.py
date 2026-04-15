@@ -29,7 +29,11 @@ class Database:
 
     @contextmanager
     def connect(self) -> Iterator[psycopg.Connection]:
-        connection = psycopg.connect(self.database_url, row_factory=dict_row)
+        connection = psycopg.connect(
+            self.database_url,
+            row_factory=dict_row,
+            prepare_threshold=None,
+        )
         try:
             yield connection
             connection.commit()
@@ -38,7 +42,11 @@ class Database:
 
     @contextmanager
     def advisory_lock(self, lock_key: int) -> Iterator[bool]:
-        connection = psycopg.connect(self.database_url, row_factory=dict_row)
+        connection = psycopg.connect(
+            self.database_url,
+            row_factory=dict_row,
+            prepare_threshold=None,
+        )
         try:
             row = connection.execute(
                 "SELECT pg_try_advisory_lock(%s) AS locked",
