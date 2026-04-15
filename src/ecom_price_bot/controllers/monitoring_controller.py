@@ -60,11 +60,23 @@ class MonitoringController:
         return report
 
     def collect_discounts(self) -> tuple[list[Discount], list[str]]:
+        return self.collect_discounts_for_vendor_ids(
+            tuple(vendor.vendor_id for vendor in self.vendor_registry.all())
+        )
+
+    def collect_discounts_for_vendor_ids(
+        self,
+        vendor_ids: tuple[str, ...],
+    ) -> tuple[list[Discount], list[str]]:
         new_discounts: list[Discount] = []
         errors: list[str] = []
         observed_on = datetime.now(tz=UTC).date()
 
-        for vendor in self.vendor_registry.all():
+        if not vendor_ids:
+            return new_discounts, errors
+
+        for vendor_id in vendor_ids:
+            vendor = self.vendor_registry.get_by_vendor_id(vendor_id)
             try:
                 discounts = vendor.fetch_discounts()
                 new_discounts.extend(self.database.save_new_discounts(discounts, observed_on))
@@ -100,15 +112,18 @@ class MonitoringController:
         prefetched_discounts: list[Discount] | None,
         report: DailyReport,
     ) -> list[Discount]:
-        todays_discounts = prefetched_discounts
-        if todays_discounts is None:
-            _, discount_errors = self.collect_discounts()
-            report.errors.extend(discount_errors)
-            todays_discounts = self.database.list_discounts_for_date(datetime.now(tz=UTC).date())
-
         vendor_ids = self.database.list_vendor_ids_for_user(telegram_user_id)
         if not vendor_ids:
             return []
+
+        todays_discounts = prefetched_discounts
+        if todays_discounts is None:
+            _, discount_errors = self.collect_discounts_for_vendor_ids(vendor_ids)
+            report.errors.extend(discount_errors)
+            todays_discounts = self.database.list_discounts_for_date(
+                datetime.now(tz=UTC).date(),
+                vendor_ids=vendor_ids,
+            )
         allowed_vendors = set(vendor_ids)
         return [discount for discount in todays_discounts if discount.vendor_id in allowed_vendors]
 

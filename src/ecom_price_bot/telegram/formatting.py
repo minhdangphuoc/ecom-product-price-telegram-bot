@@ -5,6 +5,9 @@ from decimal import Decimal
 
 from ecom_price_bot.models import DailyReport, PriceUpdate, WatchingProduct
 
+MAX_DISCOUNTS_PER_VENDOR = 10
+MAX_MESSAGE_LENGTH = 3800
+
 
 def format_currency(amount: Decimal, currency: str) -> str:
     symbols = {"EUR": "EUR ", "USD": "USD ", "GBP": "GBP "}
@@ -60,7 +63,12 @@ def format_daily_report(report: DailyReport) -> str:
 
         discount_blocks = []
         for vendor_id, items in grouped.items():
-            discount_blocks.append(f"{vendor_id}:\n" + "\n\n".join(items))
+            visible_items = items[:MAX_DISCOUNTS_PER_VENDOR]
+            block = f"{vendor_id}:\n" + "\n\n".join(visible_items)
+            hidden_count = len(items) - len(visible_items)
+            if hidden_count > 0:
+                block += f"\n\n...and {hidden_count} more discount items."
+            discount_blocks.append(block)
         sections.append("New discounts today:\n\n" + "\n\n".join(discount_blocks))
 
     if report.errors:
@@ -81,3 +89,26 @@ def format_help() -> str:
         "/chart <id> - show a price history chart for a watched product\n"
         "/help - show this message"
     )
+
+
+def split_message(text: str, *, max_length: int = MAX_MESSAGE_LENGTH) -> list[str]:
+    if len(text) <= max_length:
+        return [text]
+
+    chunks: list[str] = []
+    remaining = text
+    while len(remaining) > max_length:
+        split_at = remaining.rfind("\n\n", 0, max_length)
+        if split_at == -1:
+            split_at = remaining.rfind("\n", 0, max_length)
+        if split_at == -1:
+            split_at = max_length
+        chunk = remaining[:split_at].rstrip()
+        if not chunk:
+            chunk = remaining[:max_length]
+            split_at = max_length
+        chunks.append(chunk)
+        remaining = remaining[split_at:].lstrip()
+    if remaining:
+        chunks.append(remaining)
+    return chunks

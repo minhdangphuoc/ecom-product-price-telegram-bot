@@ -10,7 +10,12 @@ from ecom_price_bot.bootstrap import Dependencies
 from ecom_price_bot.charts import render_price_history_chart
 from ecom_price_bot.models import DailyReport, TelegramUser
 from ecom_price_bot.security import sign_chart_token
-from ecom_price_bot.telegram.formatting import format_daily_report, format_help, format_watch_list
+from ecom_price_bot.telegram.formatting import (
+    format_daily_report,
+    format_help,
+    format_watch_list,
+    split_message,
+)
 
 
 class TelegramWebhookHandler:
@@ -141,11 +146,13 @@ class TelegramWebhookHandler:
             return
 
         if command == "refresh":
+            await self._send_text(chat_id, "Refreshing prices and discounts. This can take a few seconds.")
             report = self.dependencies.monitoring_controller.refresh_user(synced_user.telegram_user_id)
             await self._send_text(chat_id, format_daily_report(report))
             return
 
         if command == "discounts":
+            await self._send_text(chat_id, "Refreshing discounts. This can take a few seconds.")
             report = self.dependencies.monitoring_controller.refresh_discounts_for_user(
                 synced_user.telegram_user_id
             )
@@ -251,11 +258,13 @@ class TelegramWebhookHandler:
         text: str,
         reply_markup: InlineKeyboardMarkup | None = None,
     ) -> None:
-        await self.bot.send_message(
-            chat_id=chat_id,
-            text=text,
-            reply_markup=reply_markup,
-        )
+        parts = split_message(text)
+        for index, part in enumerate(parts):
+            await self.bot.send_message(
+                chat_id=chat_id,
+                text=part,
+                reply_markup=reply_markup if index == len(parts) - 1 else None,
+            )
 
     def _is_allowed_user(self, telegram_user_id: int) -> bool:
         allowed = self.dependencies.settings.telegram_allowed_user_ids
