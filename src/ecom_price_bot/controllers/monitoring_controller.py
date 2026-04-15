@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime
 from zoneinfo import ZoneInfo
 
 from ecom_price_bot.config import Settings
@@ -131,6 +131,9 @@ class MonitoringController:
     def _is_user_due(self, user: TelegramUser, now_utc: datetime) -> bool:
         timezone_name = user.timezone or self.settings.default_timezone
         local_now = now_utc.astimezone(ZoneInfo(timezone_name))
+        if user.last_daily_report_on == local_now.date():
+            return False
+
         scheduled_at = local_now.replace(
             hour=self.settings.telegram_daily_time.hour,
             minute=self.settings.telegram_daily_time.minute,
@@ -140,10 +143,9 @@ class MonitoringController:
         if local_now < scheduled_at:
             return False
 
-        if local_now - scheduled_at >= timedelta(minutes=self.settings.daily_refresh_window_minutes):
-            return False
-
-        return user.last_daily_report_on != local_now.date()
+        # Vercel Hobby cron runs can arrive at any point within the scheduled hour.
+        # Treat the first invocation after the target local time as due for that date.
+        return True
 
     def _humanize_exception(self, exc: Exception) -> str:
         message = str(exc)

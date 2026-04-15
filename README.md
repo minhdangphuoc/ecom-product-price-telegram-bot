@@ -124,12 +124,13 @@ VENDOR_ADDON_MODULES=
 - the Vercel schema config
 - a daily cron schedule for `/cron/daily-refresh`
 
-The app computes each user’s local due window from `TIMEZONE` and `TELEGRAM_DAILY_TIME`, so cron can stay in UTC while user-facing notifications still follow local time.
+The app computes each user’s local due time from `TIMEZONE` and `TELEGRAM_DAILY_TIME`, so cron can stay in UTC while user-facing notifications still follow local time.
 The cron endpoint also uses a Postgres advisory lock to avoid overlapping runs.
 
 Important:
 
 - A 15-minute Vercel cron schedule is suitable when your Vercel plan supports that frequency.
+- On Hobby, the daily cron may run later within the scheduled hour, so the bot sends the first run after the configured local time for that date.
 - If you are on a plan with fewer cron runs, keep the endpoint and trigger it from another scheduler instead of changing the core app logic.
 
 ## Data model
