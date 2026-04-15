@@ -79,14 +79,17 @@ class GenericVendorService(ABC):
                 raise ValueError(self.block_page_message(response.url))
             for text in extract_discount_texts(response.text):
                 cleaned_condition = self.clean_discount_condition(text)
-                key = (extract_discount_code(cleaned_condition), cleaned_condition.casefold())
+                code = extract_discount_code(cleaned_condition)
+                if not code:
+                    continue
+                key = (code, cleaned_condition.casefold())
                 if key in seen:
                     continue
                 seen.add(key)
                 discounts.append(
                     Discount(
                         vendor_id=self.vendor_id,
-                        code=extract_discount_code(cleaned_condition),
+                        code=code,
                         condition=cleaned_condition,
                         source_url=response.url,
                     )

@@ -321,6 +321,8 @@ class Database:
         inserted: list[Discount] = []
         with self.connect() as connection:
             for discount in discounts:
+                if not discount.code:
+                    continue
                 fingerprint = hashlib.sha1(
                     json.dumps(
                         {
@@ -379,6 +381,8 @@ class Database:
                     SELECT vendor_id, code, condition, source_url
                     FROM public.discount_snapshots
                     WHERE observed_on = %s
+                      AND code IS NOT NULL
+                      AND code <> ''
                       AND vendor_id = ANY(%s)
                     ORDER BY vendor_id ASC, created_at ASC
                     """,
@@ -390,6 +394,8 @@ class Database:
                     SELECT vendor_id, code, condition, source_url
                     FROM public.discount_snapshots
                     WHERE observed_on = %s
+                      AND code IS NOT NULL
+                      AND code <> ''
                     ORDER BY vendor_id ASC, created_at ASC
                     """,
                     (observed_on,),

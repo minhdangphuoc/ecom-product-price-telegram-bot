@@ -69,7 +69,7 @@ def format_daily_report(report: DailyReport) -> str:
             if hidden_count > 0:
                 block += f"\n\n...and {hidden_count} more discount items."
             discount_blocks.append(block)
-        sections.append("New discounts today:\n\n" + "\n\n".join(discount_blocks))
+        sections.append("New discount codes today:\n\n" + "\n\n".join(discount_blocks))
 
     if report.errors:
         sections.append("Warnings:\n\n" + "\n".join(f"- {error}" for error in report.errors))
