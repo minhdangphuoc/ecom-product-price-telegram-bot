@@ -1,0 +1,14 @@
+{
+  "functions": {
+    "api/index.py": {
+      "runtime": "python3.12",
+      "excludeFiles": "{data/**,docs/**,supabase/**,__pycache__/**,**/__pycache__/**,**/*.pyc}"
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/daily-refresh",
+      "schedule": "*/15 * * * *"
+    }
+  ]
+}

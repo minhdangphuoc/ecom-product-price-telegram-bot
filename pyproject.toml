@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ecom-price-telegram-bot"
+version = "0.1.0"
+description = "Telegram bot for daily e-commerce price tracking and discount discovery."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "beautifulsoup4>=4.12.3",
+    "curl-cffi>=0.11.0",
+    "fastapi>=0.115.0",
+    "pillow>=11.0.0",
+    "psycopg[binary]>=3.2.0",
+    "python-dotenv>=1.0.1",
+    "python-telegram-bot>=22.7",
+    "uvicorn>=0.34.0",
+]
+
+[project.scripts]
+ecom-price-bot = "ecom_price_bot.main:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
