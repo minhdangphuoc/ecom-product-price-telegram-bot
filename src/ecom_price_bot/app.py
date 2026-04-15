@@ -52,17 +52,21 @@ async def daily_refresh(request: Request) -> JSONResponse:
     force_send = force_requested or (bool(expected_secret) and not is_vercel_cron)
 
     logger.info(
-        "Daily refresh requested",
-        extra={
-            "user_agent": user_agent,
-            "is_vercel_cron": is_vercel_cron,
-            "force_requested": force_requested,
-            "force_send": force_send,
-        },
+        "Daily refresh requested: is_vercel_cron=%s force_requested=%s force_send=%s user_agent=%r",
+        is_vercel_cron,
+        force_requested,
+        force_send,
+        user_agent,
     )
 
     with dependencies.database.advisory_lock(904215) as locked:
         if not locked:
+            logger.info(
+                "Daily refresh skipped: force=%s is_vercel_cron=%s reason=%s",
+                force_send,
+                is_vercel_cron,
+                "daily refresh already running",
+            )
             return JSONResponse(
                 {
                     "ok": True,
@@ -76,6 +80,14 @@ async def daily_refresh(request: Request) -> JSONResponse:
 
         handler = TelegramWebhookHandler(dependencies)
         result = await handler.send_daily_reports(force=force_send)
+        logger.info(
+            "Daily refresh result: force=%s is_vercel_cron=%s targets=%s sent=%s failed=%s",
+            force_send,
+            is_vercel_cron,
+            result["targets"],
+            result["sent"],
+            result["failed"],
+        )
         return JSONResponse(
             {
                 "ok": True,
