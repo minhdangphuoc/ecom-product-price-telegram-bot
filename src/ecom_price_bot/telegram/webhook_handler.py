@@ -81,7 +81,7 @@ class TelegramWebhookHandler:
     async def send_daily_reports(self, *, force: bool = False) -> dict[str, int]:
         now_utc = datetime.now(tz=UTC)
         target_users = (
-            self.dependencies.database.list_active_users()
+            self.dependencies.database.list_all_users()
             if force
             else self.dependencies.monitoring_controller.list_due_users(now_utc)
         )

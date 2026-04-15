@@ -47,14 +47,11 @@ async def daily_refresh(request: Request) -> JSONResponse:
 
     user_agent = request.headers.get("user-agent", "")
     is_vercel_cron = user_agent.lower().startswith("vercel-cron/")
-    force_param = request.query_params.get("force", "").strip().lower()
-    force_requested = force_param in {"1", "true", "yes", "on"}
-    force_send = force_requested or (bool(expected_secret) and not is_vercel_cron)
+    force_send = True
 
     logger.info(
-        "Daily refresh requested: is_vercel_cron=%s force_requested=%s force_send=%s user_agent=%r",
+        "Daily refresh requested: is_vercel_cron=%s force_send=%s user_agent=%r",
         is_vercel_cron,
-        force_requested,
         force_send,
         user_agent,
     )

@@ -127,6 +127,18 @@ class Database:
             ).fetchall()
         return [self._row_to_telegram_user(row) for row in rows]
 
+    def list_all_users(self) -> list[TelegramUser]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT *
+                FROM public.telegram_users
+                WHERE is_bot = FALSE
+                ORDER BY telegram_user_id ASC
+                """
+            ).fetchall()
+        return [self._row_to_telegram_user(row) for row in rows]
+
     def mark_daily_report_sent(self, telegram_user_id: int, local_date: date) -> None:
         with self.connect() as connection:
             connection.execute(
