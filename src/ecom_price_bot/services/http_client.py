@@ -4,6 +4,8 @@ from dataclasses import dataclass
 
 from curl_cffi import requests as curl_requests
 
+DEFAULT_HTTP_TIMEOUT_SECONDS = 12
+
 
 class FetchError(RuntimeError):
     """Raised when a vendor page cannot be fetched."""
@@ -34,7 +36,7 @@ class WebClient:
             response = self.session.get(
                 url,
                 impersonate="chrome136",
-                timeout=30,
+                timeout=DEFAULT_HTTP_TIMEOUT_SECONDS,
                 allow_redirects=True,
             )
         except Exception as exc:  # pragma: no cover - network transport errors are environment-specific.

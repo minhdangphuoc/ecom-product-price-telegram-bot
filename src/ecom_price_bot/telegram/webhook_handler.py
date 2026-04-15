@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
 from io import BytesIO
 from zoneinfo import ZoneInfo
@@ -16,6 +17,8 @@ from ecom_price_bot.telegram.formatting import (
     format_watch_list,
     split_message,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class TelegramWebhookHandler:
@@ -48,14 +51,30 @@ class TelegramWebhookHandler:
             default_timezone=self.dependencies.settings.default_timezone,
         )
 
-        if update.callback_query:
-            await self._handle_callback(update, synced_user)
-            return
+        try:
+            if update.callback_query:
+                await self._handle_callback(update, synced_user)
+                return
 
-        message = update.effective_message
-        if message is None or not message.text:
-            return
-        await self._handle_message(update, synced_user)
+            message = update.effective_message
+            if message is None or not message.text:
+                return
+            await self._handle_message(update, synced_user)
+        except Exception as exc:
+            logger.exception(
+                "Failed to handle Telegram update for user %s",
+                synced_user.telegram_user_id,
+            )
+            try:
+                await self._send_text(
+                    synced_user.chat_id,
+                    f"Request failed: {exc}",
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to send Telegram error message for user %s",
+                    synced_user.telegram_user_id,
+                )
 
     async def send_daily_reports(self) -> dict[str, int]:
         now_utc = datetime.now(tz=UTC)
