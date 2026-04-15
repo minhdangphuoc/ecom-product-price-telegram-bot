@@ -1,0 +1,112 @@
+GNU AFFERO GENERAL PUBLIC LICENSE
+Version 3, 19 November 2007
+
+Copyright (C) 2007 Free Software Foundation, Inc. <http://fsf.org/>
+Everyone is permitted to copy and distribute verbatim copies
+of this license document, but changing it is not allowed.
+
+Preamble
+
+The GNU General Public License is a free, copyleft license
+for software and other kinds of works.
+
+This version of the GPL is designed to ensure your freedom to
+share and change all versions of a program--to make sure it
+does what you want it to do and to protect the community's
+decision to keep it free.
+
+When we speak of free software, we are referring to freedom,
+not price. Our General Public Licenses are designed to make sure
+that you have the freedom to distribute copies of free software
+(and charge for this service if you wish), that you receive
+source code or can get it if you want it, that you can change
+the software and share your changes with others, and that you
+are informed about your rights. We protect your rights with
+four essential freedoms:
+
+ 0. To run the program as you wish, for any purpose (freedom 0).
+
+ 1. To study and change the program (freedom 1). Access to the
+    source code is a precondition for this.
+
+ 2. To redistribute copies of the original program (freedom 2).
+
+ 3. To distribute copies of your modified versions to others.
+    By doing this you can give the whole community a chance to
+    benefit from your changes. Access to the source code is a
+    precondition for this.
+
+This is how freedom is protected in our license.
+
+You may not use the software to restrict the rights of others.
+
+ 0. This License applies to any program or other work which
+    contains a notice placed by the copyright holder saying it
+    is governed by this License.
+
+       Each licensee is addressed as "you".
+
+You accept the license if you copy, modify or distribute the
+work.  Therefore, you need to keep it intact so that everyone
+else also receives it. You may not impose any further
+restrictions on the exercise of the rights granted herein.
+
+ 1. You may not use the software to restrict the core
+    freedoms of others. This includes but is not limited to
+    the act of using the software to promote dependency on a
+    service or software that is unavailable on the same terms as
+the original program.
+
+ 2. To protect your rights, we need to restrict some of your
+    actions. For example, the work may not be broken down into
+    multiple parts in a way that allows you to make parts
+    proprietary, or to disallow use of the work on
+    remote servers.
+
+General Terms
+
+ 0. You may copy and distribute verbatim copies of this
+    License document, but changing it is not allowed.
+
+ 1. You may change the program and charge for it, but if you do
+    you must provide those you give the program to with the same
+    freedoms you received.  That means they also should have
+    access to source code.
+
+ 2. If the work has been modified and you want to distribute it,
+    you must make sure that the license provides all the
+    freedoms of the original.
+
+3. You must include a copy of this License when you distribute a
+   copy of the program. This License must not be published or
+   distributed in a modified form.
+
+4. This License does not permit you to deny others their rights
+   under this License.
+
+5. Be sure that everyone including yourself knows the terms of
+   the License.
+
+Termination
+
+This License becomes ineffective when you fail to comply with
+any of its terms.
+
+If you inadvertently fail to comply with the terms of this
+License, you may be reinstated on the conditions that any
+repercussions of your noncompliance are repaired as far as
+practical. We will not enforce any legal rights to expose you
+for a nonviolation.
+
+You can remedy your failure to comply by making the necessary
+changes and notifying us.
+
+Final Provisions
+
+If you are not written explicitly enough in this License, the
+interpretation should happen in a way that grants freedom
+for all users of the referred work.
+
+The terms of this License set forth the way in which you may
+exercise the freedom to distribute, modify, and change this
+License document. It is essential to keep all freedoms intact.
