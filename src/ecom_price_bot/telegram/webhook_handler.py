@@ -73,7 +73,7 @@ class TelegramWebhookHandler:
                 extra_errors=discount_errors,
             )
             try:
-                await self.bot.send_message(chat_id=user.chat_id, text=format_daily_report(report))
+                await self._send_text(user.chat_id, format_daily_report(report))
                 local_date = now_utc.astimezone(ZoneInfo(user.timezone)).date()
                 self.dependencies.monitoring_controller.mark_daily_report_sent(
                     user.telegram_user_id,
