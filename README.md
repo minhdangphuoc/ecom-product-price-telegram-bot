@@ -14,6 +14,8 @@ Built-in vendors:
 - Zalando
 - Boozt
 - Booztlet
+- Lyko
+- Notino
 
 ## Hosting shape
 
@@ -40,6 +42,8 @@ flowchart TD
     GV --> Z["Zalando Adapter"]
     GV --> B["Boozt Adapter"]
     GV --> BL["Booztlet Adapter"]
+    GV --> L["Lyko Adapter"]
+    GV --> N["Notino Adapter"]
     GV --> ADDON["Addon Vendor Modules"]
     CTRL --> CHART["PNG Chart Renderer"]
     CHART --> TG
@@ -60,10 +64,10 @@ More detail: [docs/ARCHITECTURE.md](/C:/WORK/SideQuests/ecom-product-price-teleg
 
 When deployed to Vercel, these endpoints are exposed through `api/index.py`:
 
-- `POST /api/telegram/webhook`
-- `GET /api/cron/daily-refresh`
-- `GET /api/chart`
-- `GET /api/health`
+- `POST /telegram/webhook`
+- `GET /cron/daily-refresh`
+- `GET /chart`
+- `GET /health`
 
 ## Telegram commands
 
@@ -82,7 +86,7 @@ When deployed to Vercel, these endpoints are exposed through `api/index.py`:
 2. Apply the migration in [20260415013000_init_price_bot.sql](/C:/WORK/SideQuests/ecom-product-price-telegram-bot/supabase/migrations/20260415013000_init_price_bot.sql).
 3. Create a Vercel project and deploy this repo.
 4. Configure environment variables from `.env.example`.
-5. Set the Telegram webhook to `https://<your-domain>/api/telegram/webhook`.
+5. Set the Telegram webhook to `https://<your-domain>/telegram/webhook`.
 6. Optionally set the Telegram webhook secret header token.
 
 Local run:
@@ -117,8 +121,8 @@ VENDOR_ADDON_MODULES=
 
 [vercel.json](/C:/WORK/SideQuests/ecom-product-price-telegram-bot/vercel.json) includes:
 
-- Python runtime for `api/index.py`
-- A `*/15 * * * *` cron schedule for `/api/cron/daily-refresh`
+- the Vercel schema config
+- a daily cron schedule for `/cron/daily-refresh`
 
 The app computes each user’s local due window from `TIMEZONE` and `TELEGRAM_DAILY_TIME`, so cron can stay in UTC while user-facing notifications still follow local time.
 The cron endpoint also uses a Postgres advisory lock to avoid overlapping runs.
@@ -144,4 +148,5 @@ Each watched product belongs to one Telegram user, so every user gets an isolate
 - Product parsing still prefers JSON-LD and metadata before falling back to visible text.
 - Discount crawling is best-effort because many stores do not expose structured coupon feeds.
 - Zalando may still return anti-bot protection pages depending on network/session context.
+- Lyko and Notino product pages currently parse with the shared generic product extractor.
 - The chart endpoint is signed with `CHART_SIGNING_SECRET` so product history URLs are not guessable.

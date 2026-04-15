@@ -31,6 +31,8 @@ Built-in vendors:
 - `zalando`
 - `boozt`
 - `booztlet`
+- `lyko`
+- `notino`
 
 Addon vendors can be loaded through `VENDOR_ADDON_MODULES`.
 
