@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
 
 from fastapi import FastAPI, Header, HTTPException, Request
@@ -12,6 +13,7 @@ from ecom_price_bot.telegram.webhook_handler import TelegramWebhookHandler
 
 
 app = FastAPI(title="ecom-price-telegram-bot")
+logger = logging.getLogger(__name__)
 
 
 @app.get("/health")
@@ -43,6 +45,22 @@ async def daily_refresh(request: Request) -> JSONResponse:
     if expected_secret and authorization != f"Bearer {expected_secret}":
         raise HTTPException(status_code=401, detail="Invalid cron secret.")
 
+    user_agent = request.headers.get("user-agent", "")
+    is_vercel_cron = user_agent.lower().startswith("vercel-cron/")
+    force_param = request.query_params.get("force", "").strip().lower()
+    force_requested = force_param in {"1", "true", "yes", "on"}
+    force_send = force_requested or (bool(expected_secret) and not is_vercel_cron)
+
+    logger.info(
+        "Daily refresh requested",
+        extra={
+            "user_agent": user_agent,
+            "is_vercel_cron": is_vercel_cron,
+            "force_requested": force_requested,
+            "force_send": force_send,
+        },
+    )
+
     with dependencies.database.advisory_lock(904215) as locked:
         if not locked:
             return JSONResponse(
@@ -50,15 +68,20 @@ async def daily_refresh(request: Request) -> JSONResponse:
                     "ok": True,
                     "skipped": True,
                     "reason": "daily refresh already running",
+                    "force": force_send,
+                    "is_vercel_cron": is_vercel_cron,
                     "at": datetime.now(tz=UTC).isoformat(),
                 }
             )
 
         handler = TelegramWebhookHandler(dependencies)
-        result = await handler.send_daily_reports()
+        result = await handler.send_daily_reports(force=force_send)
         return JSONResponse(
             {
                 "ok": True,
+                "force": force_send,
+                "is_vercel_cron": is_vercel_cron,
+                "targets": result["targets"],
                 "sent": result["sent"],
                 "failed": result["failed"],
                 "at": datetime.now(tz=UTC).isoformat(),

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from decimal import Decimal
+from html import escape
 
 from ecom_price_bot.models import DailyReport, PriceUpdate, WatchingProduct
 
@@ -13,88 +14,114 @@ def format_watch_index(watch: WatchingProduct) -> str:
     return str(watch.display_index) if watch.display_index is not None else "?"
 
 
+def _e(value: object) -> str:
+    return escape(str(value), quote=True)
+
+
+def _product_link(url: str, label: str = "Open product") -> str:
+    return f'<a href="{_e(url)}">{_e(label)}</a>'
+
+
 def format_currency(amount: Decimal, currency: str) -> str:
     symbols = {"EUR": "EUR ", "USD": "USD ", "GBP": "GBP "}
     return f"{symbols.get(currency.upper(), currency.upper() + ' ')}{amount:.2f}"
 
 
 def format_price_update(update: PriceUpdate) -> str:
-    base = (
-        f"[{format_watch_index(update.watch)}] {update.current.name}\n"
-        f"{format_currency(update.current.price, update.current.currency)}"
-    )
+    header = f"🧾 <b>[{format_watch_index(update.watch)}] {_e(update.current.name)}</b>"
+    price_line = f"💰 <b>{format_currency(update.current.price, update.current.currency)}</b>"
     if update.delta is not None:
         direction = "down" if update.delta < 0 else "up" if update.delta > 0 else "same"
         if direction == "same":
-            base += " (unchanged)"
+            price_line += "  •  ➖ unchanged"
         else:
-            base += f" ({direction} {abs(update.delta):.2f})"
+            trend_icon = "📉" if direction == "down" else "📈"
+            price_line += f"  •  {trend_icon} {direction} {abs(update.delta):.2f}"
     else:
-        base += " (new watch)"
+        price_line += "  •  🆕 new watch"
+    details = [header, price_line, f"🏷️ Vendor: {_e(update.current.vendor_id)}"]
     if not update.current.in_stock:
-        base += "\nStatus: Out of stock"
-    base += f"\nVendor: {update.current.vendor_id}\n{update.watch.url}"
-    return base
+        details.append("📦 Status: Out of stock")
+    details.append(f"🔗 {_product_link(update.watch.url)}")
+    return "\n".join(details)
 
 
 def format_watch_list(watches: list[WatchingProduct]) -> str:
     if not watches:
-        return "No watched products yet. Use /watch <product-url> to add one."
-    parts = ["Watching products:"]
+        return (
+            "👀 <b>Your watchlist is empty</b>\n"
+            "<i>Add a product link to start tracking drops and discount codes.</i>\n\n"
+            "Use <code>/watch &lt;product-url&gt;</code> to add one."
+        )
+    parts = [
+        "👀 <b>Your Watchlist</b>\n"
+        "<i>Products are numbered from 1 so you can quickly remove them or open charts.</i>"
+    ]
     for watch in watches:
         parts.append(
-            f"[{format_watch_index(watch)}] {watch.name} ({watch.vendor_id})\n"
-            f"{watch.url}\n"
-            f"Use /chart {format_watch_index(watch)} for a price chart."
+            f"🛍️ <b>[{format_watch_index(watch)}] {_e(watch.name)}</b>\n"
+            f"🏷️ Vendor: {_e(watch.vendor_id)}\n"
+            f"🔗 {_product_link(watch.url)}\n"
+            f"📈 Use <code>/chart {format_watch_index(watch)}</code> for a price chart."
         )
     return "\n\n".join(parts)
 
 
 def format_daily_report(report: DailyReport) -> str:
-    sections: list[str] = []
+    sections: list[str] = [
+        "✨ <b>Ecom Price Bot</b>\n<i>Fresh price tracking and promo-code updates.</i>"
+    ]
     if report.updates:
         sections.append(
-            "Daily price update:\n\n" + "\n\n".join(format_price_update(update) for update in report.updates)
+            "📦 <b>Price Updates</b>\n\n"
+            + "\n\n".join(format_price_update(update) for update in report.updates)
         )
     else:
-        sections.append("Daily price update:\n\nNo watched products yet.")
+        sections.append(
+            "📦 <b>Price Updates</b>\n\n"
+            "No watched products yet."
+        )
 
     if report.new_discounts:
         grouped: dict[str, list[str]] = defaultdict(list)
         for discount in report.new_discounts:
-            line = discount.condition
+            line = _e(discount.condition)
             if discount.code:
-                line = f"{line}\nCode: {discount.code}"
-            line += f"\n{discount.source_url}"
+                line = f"{line}\n🎟️ Code: <code>{_e(discount.code)}</code>"
+            line += f'\n🔗 <a href="{_e(discount.source_url)}">Open source</a>'
             grouped[discount.vendor_id].append(line)
 
         discount_blocks = []
         for vendor_id, items in grouped.items():
             visible_items = items[:MAX_DISCOUNTS_PER_VENDOR]
-            block = f"{vendor_id}:\n" + "\n\n".join(visible_items)
+            block = f"<b>{_e(vendor_id)}</b>\n" + "\n\n".join(visible_items)
             hidden_count = len(items) - len(visible_items)
             if hidden_count > 0:
                 block += f"\n\n...and {hidden_count} more discount items."
             discount_blocks.append(block)
-        sections.append("New discount codes today:\n\n" + "\n\n".join(discount_blocks))
+        sections.append("🎟️ <b>Discount Codes</b>\n\n" + "\n\n".join(discount_blocks))
 
     if report.errors:
-        sections.append("Warnings:\n\n" + "\n".join(f"- {error}" for error in report.errors))
+        sections.append(
+            "⚠️ <b>Warnings</b>\n\n" + "\n".join(f"• {_e(error)}" for error in report.errors)
+        )
 
     return "\n\n".join(sections)
 
 
 def format_help() -> str:
     return (
-        "Commands:\n"
-        "/watch <url> - add a product to the watch list\n"
-        "/add <url> - alias for /watch\n"
-        "/list - show watched products\n"
-        "/remove <index|url> - remove a watched product\n"
-        "/refresh - fetch prices and discounts now\n"
-        "/discounts - fetch only discounts now\n"
-        "/chart <index> - show a price history chart for a watched product\n"
-        "/help - show this message"
+        "✨ <b>Ecom Price Bot</b>\n"
+        "<i>Track products, check promo codes, and view price charts.</i>\n\n"
+        "<b>Commands</b>\n"
+        "<code>/watch &lt;url&gt;</code> - add a product to the watch list\n"
+        "<code>/add &lt;url&gt;</code> - alias for /watch\n"
+        "<code>/list</code> - show watched products\n"
+        "<code>/remove &lt;index|url&gt;</code> - remove a watched product\n"
+        "<code>/refresh</code> - fetch prices and discounts now\n"
+        "<code>/discounts</code> - fetch only discounts now\n"
+        "<code>/chart &lt;index&gt;</code> - show a price history chart\n"
+        "<code>/help</code> - show this message"
     )
 
 

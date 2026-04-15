@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
+from html import escape
 from io import BytesIO
 from zoneinfo import ZoneInfo
 
@@ -69,7 +70,7 @@ class TelegramWebhookHandler:
             try:
                 await self._send_text(
                     synced_user.chat_id,
-                    f"Request failed: {exc}",
+                    f"⚠️ <b>Request failed</b>\n{escape(str(exc), quote=True)}",
                 )
             except Exception:
                 logger.exception(
@@ -77,16 +78,20 @@ class TelegramWebhookHandler:
                     synced_user.telegram_user_id,
                 )
 
-    async def send_daily_reports(self) -> dict[str, int]:
+    async def send_daily_reports(self, *, force: bool = False) -> dict[str, int]:
         now_utc = datetime.now(tz=UTC)
-        due_users = self.dependencies.monitoring_controller.list_due_users(now_utc)
+        target_users = (
+            self.dependencies.database.list_active_users()
+            if force
+            else self.dependencies.monitoring_controller.list_due_users(now_utc)
+        )
         sent = 0
         failed = 0
 
         _, discount_errors = self.dependencies.monitoring_controller.collect_discounts()
         todays_discounts = self.dependencies.database.list_discounts_for_date(now_utc.date())
 
-        for user in due_users:
+        for user in target_users:
             report = self.dependencies.monitoring_controller.build_user_report(
                 user.telegram_user_id,
                 prefetched_discounts=todays_discounts,
@@ -102,7 +107,7 @@ class TelegramWebhookHandler:
                 sent += 1
             except Exception:
                 failed += 1
-        return {"sent": sent, "failed": failed}
+        return {"targets": len(target_users), "sent": sent, "failed": failed}
 
     async def _handle_message(self, update: Update, synced_user: TelegramUser) -> None:
         message = update.effective_message
@@ -118,7 +123,10 @@ class TelegramWebhookHandler:
 
         if command in {"watch", "add"}:
             if not argument:
-                await self._send_text(chat_id, "Usage: /watch <product-url>")
+                await self._send_text(
+                    chat_id,
+                    "➕ <b>Add a watched product</b>\nUse <code>/watch &lt;product-url&gt;</code>",
+                )
                 return
             try:
                 result = self.dependencies.watchlist_controller.add_watch(
@@ -127,11 +135,14 @@ class TelegramWebhookHandler:
                 )
                 await self._send_text(
                     chat_id,
-                    "Watch added successfully.\n\n"
+                    "✅ <b>Watch added</b>\n\n"
                     + format_daily_report(DailyReport(updates=[result])),
                 )
             except Exception as exc:
-                await self._send_text(chat_id, f"Failed to add watch: {exc}")
+                await self._send_text(
+                    chat_id,
+                    f"⚠️ <b>Failed to add watch</b>\n{escape(str(exc), quote=True)}",
+                )
             return
 
         if command == "list":
@@ -147,11 +158,11 @@ class TelegramWebhookHandler:
             if not argument:
                 watches = self.dependencies.watchlist_controller.list_watches(synced_user.telegram_user_id)
                 if not watches:
-                    await self._send_text(chat_id, "Watch list is already empty.")
+                    await self._send_text(chat_id, "🧹 <b>Your watchlist is already empty.</b>")
                     return
                 await self._send_text(
                     chat_id,
-                    "Choose a product to remove:",
+                    "🗑️ <b>Choose a product to remove</b>",
                     reply_markup=self._build_watch_keyboard(watches),
                 )
                 return
@@ -160,22 +171,31 @@ class TelegramWebhookHandler:
                 argument,
             )
             if removed is None:
-                await self._send_text(chat_id, "Nothing matched that watch index or url.")
+                await self._send_text(
+                    chat_id,
+                    "🔎 <b>No watch matched</b>\nTry a watch index from <code>/list</code> or paste the product URL.",
+                )
                 return
             await self._send_text(
                 chat_id,
-                f"Removed watch [{format_watch_index(removed)}] {removed.name}",
+                f"🗑️ <b>Removed watch [{format_watch_index(removed)}]</b>\n{escape(removed.name, quote=True)}",
             )
             return
 
         if command == "refresh":
-            await self._send_text(chat_id, "Refreshing prices and discounts. This can take a few seconds.")
+            await self._send_text(
+                chat_id,
+                "⏳ <b>Refreshing prices and discount codes</b>\nThis can take a few seconds.",
+            )
             report = self.dependencies.monitoring_controller.refresh_user(synced_user.telegram_user_id)
             await self._send_text(chat_id, format_daily_report(report))
             return
 
         if command == "discounts":
-            await self._send_text(chat_id, "Refreshing discounts. This can take a few seconds.")
+            await self._send_text(
+                chat_id,
+                "🎟️ <b>Refreshing discount codes</b>\nThis can take a few seconds.",
+            )
             report = self.dependencies.monitoring_controller.refresh_discounts_for_user(
                 synced_user.telegram_user_id
             )
@@ -184,7 +204,10 @@ class TelegramWebhookHandler:
 
         if command == "chart":
             if not argument or not argument.isdigit():
-                await self._send_text(chat_id, "Usage: /chart <watch-index>")
+                await self._send_text(
+                    chat_id,
+                    "📈 <b>Open a chart</b>\nUse <code>/chart &lt;watch-index&gt;</code>",
+                )
                 return
             await self._send_chart(synced_user, argument, reply_chat_id=synced_user.chat_id)
             return
@@ -249,7 +272,11 @@ class TelegramWebhookHandler:
             watch_identifier,
         )
         if watch is None:
-            await self.bot.send_message(chat_id=reply_chat_id, text="Unknown watch index.")
+            await self.bot.send_message(
+                chat_id=reply_chat_id,
+                text="🔎 <b>Unknown watch index.</b>",
+                parse_mode="HTML",
+            )
             return
 
         history = self.dependencies.watchlist_controller.get_price_history(
@@ -263,7 +290,11 @@ class TelegramWebhookHandler:
         await self.bot.send_photo(
             chat_id=reply_chat_id,
             photo=InputFile(BytesIO(chart_bytes), filename=f"watch-{label}.png"),
-            caption=f"Price chart for [{label}] {watch.name}",
+            caption=(
+                f"📈 <b>Price chart</b>\n"
+                f"<b>[{label}] {escape(watch.name, quote=True)}</b>"
+            ),
+            parse_mode="HTML",
             reply_markup=reply_markup,
         )
 
@@ -311,6 +342,8 @@ class TelegramWebhookHandler:
             await self.bot.send_message(
                 chat_id=chat_id,
                 text=part,
+                parse_mode="HTML",
+                disable_web_page_preview=True,
                 reply_markup=reply_markup if index == len(parts) - 1 else None,
             )
 
