@@ -27,7 +27,7 @@ class TelegramWebhookHandler:
 
         if not self._is_allowed_user(telegram_user.id):
             if update.effective_message:
-                await update.effective_message.reply_text("This user is not authorized for the bot.")
+                await self._send_text(chat.id, "This user is not authorized for the bot.")
             elif update.callback_query:
                 await update.callback_query.answer("Unauthorized", show_alert=True)
             return
@@ -85,31 +85,34 @@ class TelegramWebhookHandler:
             return
 
         command, argument = self._parse_command(message.text)
+        chat_id = synced_user.chat_id
 
         if command in {"start", "help"}:
-            await message.reply_text(format_help())
+            await self._send_text(chat_id, format_help())
             return
 
         if command in {"watch", "add"}:
             if not argument:
-                await message.reply_text("Usage: /watch <product-url>")
+                await self._send_text(chat_id, "Usage: /watch <product-url>")
                 return
             try:
                 result = self.dependencies.watchlist_controller.add_watch(
                     synced_user.telegram_user_id,
                     argument,
                 )
-                await message.reply_text(
+                await self._send_text(
+                    chat_id,
                     "Watch added successfully.\n\n"
-                    + format_daily_report(DailyReport(updates=[result]))
+                    + format_daily_report(DailyReport(updates=[result])),
                 )
             except Exception as exc:
-                await message.reply_text(f"Failed to add watch: {exc}")
+                await self._send_text(chat_id, f"Failed to add watch: {exc}")
             return
 
         if command == "list":
             watches = self.dependencies.watchlist_controller.list_watches(synced_user.telegram_user_id)
-            await message.reply_text(
+            await self._send_text(
+                chat_id,
                 format_watch_list(watches),
                 reply_markup=self._build_watch_keyboard(watches),
             )
@@ -119,9 +122,10 @@ class TelegramWebhookHandler:
             if not argument:
                 watches = self.dependencies.watchlist_controller.list_watches(synced_user.telegram_user_id)
                 if not watches:
-                    await message.reply_text("Watch list is already empty.")
+                    await self._send_text(chat_id, "Watch list is already empty.")
                     return
-                await message.reply_text(
+                await self._send_text(
+                    chat_id,
                     "Choose a product to remove:",
                     reply_markup=self._build_watch_keyboard(watches),
                 )
@@ -131,32 +135,32 @@ class TelegramWebhookHandler:
                 argument,
             )
             if removed is None:
-                await message.reply_text("Nothing matched that watch id or url.")
+                await self._send_text(chat_id, "Nothing matched that watch id or url.")
                 return
-            await message.reply_text(f"Removed watch [{removed.id}] {removed.name}")
+            await self._send_text(chat_id, f"Removed watch [{removed.id}] {removed.name}")
             return
 
         if command == "refresh":
             report = self.dependencies.monitoring_controller.refresh_user(synced_user.telegram_user_id)
-            await message.reply_text(format_daily_report(report))
+            await self._send_text(chat_id, format_daily_report(report))
             return
 
         if command == "discounts":
             report = self.dependencies.monitoring_controller.refresh_discounts_for_user(
                 synced_user.telegram_user_id
             )
-            await message.reply_text(format_daily_report(report))
+            await self._send_text(chat_id, format_daily_report(report))
             return
 
         if command == "chart":
             if not argument or not argument.isdigit():
-                await message.reply_text("Usage: /chart <watch-id>")
+                await self._send_text(chat_id, "Usage: /chart <watch-id>")
                 return
             await self._send_chart(synced_user, int(argument), reply_chat_id=synced_user.chat_id)
             return
 
         if command:
-            await message.reply_text(format_help())
+            await self._send_text(chat_id, format_help())
 
     async def _handle_callback(self, update: Update, synced_user: TelegramUser) -> None:
         query = update.callback_query
@@ -234,12 +238,24 @@ class TelegramWebhookHandler:
 
         signature = sign_chart_token(signing_secret, synced_user.telegram_user_id, watch_id)
         url = (
-            f"{app_base_url.rstrip('/')}/api/chart"
+            f"{app_base_url.rstrip('/')}/chart"
             f"?telegram_user_id={synced_user.telegram_user_id}"
             f"&watch_id={watch_id}"
             f"&sig={signature}"
         )
         return InlineKeyboardMarkup([[InlineKeyboardButton("Open chart link", url=url)]])
+
+    async def _send_text(
+        self,
+        chat_id: int,
+        text: str,
+        reply_markup: InlineKeyboardMarkup | None = None,
+    ) -> None:
+        await self.bot.send_message(
+            chat_id=chat_id,
+            text=text,
+            reply_markup=reply_markup,
+        )
 
     def _is_allowed_user(self, telegram_user_id: int) -> bool:
         allowed = self.dependencies.settings.telegram_allowed_user_ids
