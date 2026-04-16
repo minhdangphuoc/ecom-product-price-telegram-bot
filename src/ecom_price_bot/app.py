@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import UTC, datetime
 
@@ -10,10 +11,42 @@ from ecom_price_bot.bootstrap import get_dependencies
 from ecom_price_bot.charts import render_price_history_chart
 from ecom_price_bot.security import verify_chart_token
 from ecom_price_bot.telegram.webhook_handler import TelegramWebhookHandler
+from ecom_price_bot.telegram.webhook_sync import sync_telegram_webhook
 
 
 app = FastAPI(title="ecom-price-telegram-bot")
 logger = logging.getLogger(__name__)
+_webhook_sync_lock = asyncio.Lock()
+_webhook_sync_completed = False
+
+
+async def _ensure_runtime_webhook_sync() -> None:
+    global _webhook_sync_completed
+    if _webhook_sync_completed:
+        return
+
+    async with _webhook_sync_lock:
+        if _webhook_sync_completed:
+            return
+
+        dependencies = get_dependencies()
+        try:
+            result = await sync_telegram_webhook(
+                dependencies.telegram_bot,
+                dependencies.settings,
+            )
+        except Exception:
+            logger.exception("Telegram webhook auto-sync failed.")
+            return
+
+        logger.info("Telegram webhook auto-sync result: %s", result)
+        _webhook_sync_completed = True
+
+
+@app.middleware("http")
+async def auto_sync_telegram_webhook(request: Request, call_next):
+    await _ensure_runtime_webhook_sync()
+    return await call_next(request)
 
 
 @app.get("/health")

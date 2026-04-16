@@ -91,6 +91,9 @@ When deployed to Vercel, these endpoints are exposed through `api/index.py`:
 5. Set the Telegram webhook to `https://<your-domain>/telegram/webhook`.
 6. Optionally set the Telegram webhook secret header token.
 
+If `APP_BASE_URL` is set to your deployed public domain, the app also auto-syncs
+the Telegram webhook to `<APP_BASE_URL>/telegram/webhook` on runtime startup.
+
 Local run:
 
 ```powershell
