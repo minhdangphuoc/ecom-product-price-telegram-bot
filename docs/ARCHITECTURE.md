@@ -34,6 +34,7 @@ Built-in vendors:
 - `lyko`
 - `notino`
 - `prisma`
+- `uniqlo`
 
 Addon vendors can be loaded through `VENDOR_ADDON_MODULES`.
 
