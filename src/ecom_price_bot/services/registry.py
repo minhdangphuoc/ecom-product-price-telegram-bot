@@ -12,6 +12,7 @@ from ecom_price_bot.services.vendors.lyko import LykoVendor
 from ecom_price_bot.services.vendors.notino import NotinoVendor
 from ecom_price_bot.services.vendors.prisma import PrismaVendor
 from ecom_price_bot.services.vendors.uniqlo import UniqloVendor
+from ecom_price_bot.services.vendors.wardow import WardowVendor
 from ecom_price_bot.services.vendors.zalando import ZalandoVendor
 
 
@@ -30,6 +31,7 @@ class VendorRegistry:
             NotinoVendor,
             PrismaVendor,
             UniqloVendor,
+            WardowVendor,
         ]
         vendor_classes.extend(_load_addon_vendor_classes(addon_modules))
         vendors = [vendor_class(web_client) for vendor_class in vendor_classes]

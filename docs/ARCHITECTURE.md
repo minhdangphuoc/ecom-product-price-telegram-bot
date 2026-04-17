@@ -35,6 +35,7 @@ Built-in vendors:
 - `notino`
 - `prisma`
 - `uniqlo`
+- `wardow`
 
 Addon vendors can be loaded through `VENDOR_ADDON_MODULES`.
 

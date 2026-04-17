@@ -18,6 +18,7 @@ Built-in vendors:
 - Notino
 - Prisma
 - Uniqlo
+- Wardow
 
 ## Hosting shape
 
@@ -48,6 +49,7 @@ flowchart TD
     GV --> N["Notino Adapter"]
     GV --> P["Prisma Adapter"]
     GV --> U["Uniqlo Adapter"]
+    GV --> W["Wardow Adapter"]
     GV --> ADDON["Addon Vendor Modules"]
     CTRL --> CHART["PNG Chart Renderer"]
     CHART --> TG
@@ -156,5 +158,5 @@ Each watched product belongs to one Telegram user, so every user gets an isolate
 - Product parsing still prefers JSON-LD and metadata before falling back to visible text.
 - Discount crawling is best-effort because many stores do not expose structured coupon feeds.
 - Zalando may still return anti-bot protection pages depending on network/session context.
-- Lyko, Notino, Prisma, and Uniqlo product pages currently parse with the shared generic product extractor.
+- Lyko, Notino, Prisma, Uniqlo, and Wardow product pages currently parse with the shared generic product extractor.
 - The chart endpoint is signed with `CHART_SIGNING_SECRET` so product history URLs are not guessable.
