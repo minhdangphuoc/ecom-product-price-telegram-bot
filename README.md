@@ -87,7 +87,7 @@ When deployed to Vercel, these endpoints are exposed through `api/index.py`:
 ## Setup
 
 1. Create a Supabase project.
-2. Apply the migration in [20260415013000_init_price_bot.sql](/C:/WORK/SideQuests/ecom-product-price-telegram-bot/supabase/migrations/20260415013000_init_price_bot.sql).
+2. Apply every SQL migration in [supabase/migrations](supabase/migrations) in timestamp order.
 3. Create a Vercel project and deploy this repo.
 4. Configure environment variables from `.env.example`.
 5. Set the Telegram webhook to `https://<your-domain>/telegram/webhook`.
@@ -150,6 +150,8 @@ Main tables:
 - `discount_snapshots`
 
 Each watched product belongs to one Telegram user, so every user gets an isolated list and isolated history.
+
+All `public` tables are expected to run with Row Level Security enabled. The app itself talks to Postgres through the server-side `SUPABASE_DB_URL`, so backend jobs and webhook handlers can keep working while anonymous PostgREST access stays blocked.
 
 ## Notes
 
