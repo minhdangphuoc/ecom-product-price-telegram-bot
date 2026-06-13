@@ -4,7 +4,7 @@ from collections import defaultdict
 from decimal import Decimal
 from html import escape
 
-from ecom_price_bot.models import DailyReport, PriceUpdate, WatchingProduct
+from ecom_price_bot.models import DailyReport, InregoItem, PriceUpdate, WatchingProduct
 
 MAX_DISCOUNTS_PER_VENDOR = 10
 MAX_MESSAGE_LENGTH = 3800
@@ -67,6 +67,54 @@ def format_watch_list(watches: list[WatchingProduct]) -> str:
     return "\n\n".join(parts)
 
 
+_INREGO_CONDITION_LABELS = {"hyvä": "Good", "loistava": "Excellent", "tyydyttävä": "Fair"}
+
+
+def _format_euro(amount: Decimal) -> str:
+    quantized = amount.quantize(Decimal("1")) if amount == amount.to_integral_value() else amount
+    return f"{quantized:,} €".replace(",", " ")
+
+
+def _format_inrego_item(item: InregoItem) -> str:
+    lines = [f"💻 <b>{_e(item.name)}</b>"]
+
+    if item.old_price is not None and item.old_price > item.price:
+        price_line = f"💰 <b>{_format_euro(item.price)}</b>  <s>{_format_euro(item.old_price)}</s>"
+        if item.discount_label:
+            price_line += f"  •  🔻 {_e(item.discount_label)}"
+    else:
+        price_line = f"💰 <b>{_format_euro(item.price)}</b>"
+    lines.append(price_line)
+
+    if item.specs:
+        lines.append(f"🔧 {_e(' · '.join(item.specs))}")
+
+    meta = []
+    if item.condition:
+        meta.append(_INREGO_CONDITION_LABELS.get(item.condition.lower(), item.condition))
+    if item.size:
+        meta.append(item.size)
+    if item.color:
+        meta.append(item.color)
+    if meta:
+        lines.append(f"🏷️ {_e(' · '.join(meta))}")
+
+    if not item.in_stock:
+        lines.append("📦 Status: Out of stock")
+    lines.append(f"🔗 {_product_link(item.url)}")
+    return "\n".join(lines)
+
+
+def format_inrego_section(items: list[InregoItem]) -> str:
+    header = (
+        "💻 <b>Inrego MacBooks</b>\n"
+        "<i>Live refurbished stock — sells out fast.</i>"
+    )
+    if not items:
+        return header + "\n\nNo MacBooks listed right now."
+    return header + "\n\n" + "\n\n".join(_format_inrego_item(item) for item in items)
+
+
 def format_daily_report(report: DailyReport) -> str:
     sections: list[str] = [
         "✨ <b>Ecom Price Bot</b>\n<i>Fresh price tracking and promo-code updates.</i>"
@@ -121,6 +169,7 @@ def format_help() -> str:
         "<code>/refresh</code> - fetch prices and discounts now\n"
         "<code>/discounts</code> - fetch only discounts now\n"
         "<code>/chart &lt;index&gt;</code> - show a price history chart\n"
+        "<code>/inrego-mac</code> - list live MacBook deals from Inrego\n"
         "<code>/help</code> - show this message"
     )
 

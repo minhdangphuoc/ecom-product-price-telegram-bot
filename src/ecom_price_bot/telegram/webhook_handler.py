@@ -15,6 +15,7 @@ from ecom_price_bot.security import sign_chart_token
 from ecom_price_bot.telegram.formatting import (
     format_daily_report,
     format_help,
+    format_inrego_section,
     format_watch_index,
     format_watch_list,
     split_message,
@@ -90,6 +91,7 @@ class TelegramWebhookHandler:
 
         _, discount_errors = self.dependencies.monitoring_controller.collect_discounts()
         todays_discounts = self.dependencies.database.list_discounts_for_date(now_utc.date())
+        inrego_section = self._build_inrego_section()
 
         for user in target_users:
             report = self.dependencies.monitoring_controller.build_user_report(
@@ -98,7 +100,10 @@ class TelegramWebhookHandler:
                 extra_errors=discount_errors,
             )
             try:
-                await self._send_text(user.chat_id, format_daily_report(report))
+                message = format_daily_report(report)
+                if inrego_section:
+                    message += "\n\n" + inrego_section
+                await self._send_text(user.chat_id, message)
                 local_date = now_utc.astimezone(ZoneInfo(user.timezone)).date()
                 self.dependencies.monitoring_controller.mark_daily_report_sent(
                     user.telegram_user_id,
@@ -108,6 +113,16 @@ class TelegramWebhookHandler:
             except Exception:
                 failed += 1
         return {"targets": len(target_users), "sent": sent, "failed": failed}
+
+    def _build_inrego_section(self) -> str | None:
+        """Fetch the live Inrego MacBook catalog. Returns None on failure so a
+        scrape outage never blocks the daily price report."""
+        try:
+            items = self.dependencies.inrego_scraper.fetch_macbooks()
+        except Exception:
+            logger.exception("Failed to fetch Inrego MacBook catalog")
+            return None
+        return format_inrego_section(items)
 
     async def _handle_message(self, update: Update, synced_user: TelegramUser) -> None:
         message = update.effective_message
@@ -200,6 +215,21 @@ class TelegramWebhookHandler:
                 synced_user.telegram_user_id
             )
             await self._send_text(chat_id, format_daily_report(report))
+            return
+
+        if command in {"inrego-mac", "inrego_mac", "inregomac", "macbook"}:
+            await self._send_text(
+                chat_id,
+                "💻 <b>Fetching live Inrego MacBook deals</b>\nThis can take a few seconds.",
+            )
+            section = self._build_inrego_section()
+            if section is None:
+                await self._send_text(
+                    chat_id,
+                    "⚠️ <b>Could not reach Inrego right now.</b>\nTry again shortly.",
+                )
+                return
+            await self._send_text(chat_id, section)
             return
 
         if command == "chart":

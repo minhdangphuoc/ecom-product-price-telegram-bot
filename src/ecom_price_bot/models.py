@@ -79,6 +79,27 @@ class PriceUpdate:
 
 
 @dataclass(slots=True)
+class InregoItem:
+    """A single refurbished MacBook listing scraped from shop.inrego.fi.
+
+    Inrego stock turns over fast, so these are fetched live on every check and
+    never persisted; the bot just relays the current catalog snapshot.
+    """
+
+    name: str
+    url: str
+    price: Decimal
+    currency: str = "EUR"
+    old_price: Decimal | None = None
+    discount_label: str | None = None
+    condition: str | None = None
+    size: str | None = None
+    color: str | None = None
+    specs: list[str] = field(default_factory=list)
+    in_stock: bool = True
+
+
+@dataclass(slots=True)
 class DailyReport:
     updates: list[PriceUpdate] = field(default_factory=list)
     new_discounts: list[Discount] = field(default_factory=list)
